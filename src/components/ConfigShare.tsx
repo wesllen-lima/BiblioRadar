@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { encodeState, decodeState } from "@/lib/shareState";
 import { useI18n } from "@/components/I18nProvider";
 import type { CustomProvider } from "@/components/ProvidersManager";
@@ -42,6 +42,23 @@ export default function ConfigShare({
     return { version: 2, providers, externalSites };
   }, [providers]);
 
+  const applyFromObject = useCallback(
+    async (obj: SharedConfig) => {
+      const ext = Array.isArray(obj.externalSites) ? obj.externalSites : [];
+      const prov = Array.isArray(obj.providers) ? obj.providers : [];
+      try {
+        localStorage.setItem("external_sites_v2", JSON.stringify(ext));
+      } catch {}
+      try {
+        localStorage.setItem("custom_providers_v2", JSON.stringify(prov));
+      } catch {}
+      onApply({ providers: prov, externalSites: ext });
+      onRemountExternal();
+      onRemountProviders();
+    },
+    [onApply, onRemountExternal, onRemountProviders]
+  );
+
   async function copyLink() {
     const hash = encodeState(toObject);
     const url = `${location.origin}${location.pathname}#brcfg=${hash}`;
@@ -61,34 +78,11 @@ export default function ConfigShare({
     URL.revokeObjectURL(a.href);
   }
 
-  async function applyFromObject(obj: SharedConfig) {
-    const ext = Array.isArray(obj.externalSites) ? obj.externalSites : [];
-    const prov = Array.isArray(obj.providers) ? obj.providers : [];
-    try {
-      localStorage.setItem("external_sites_v2", JSON.stringify(ext));
-    } catch {}
-    try {
-      localStorage.setItem("custom_providers_v2", JSON.stringify(prov));
-    } catch {}
-    onApply({ providers: prov, externalSites: ext });
-    onRemountExternal();
-    onRemountProviders();
-  }
-
   function importFromText() {
     try {
       const obj = JSON.parse(pendingText) as SharedConfig;
       applyFromObject(obj);
       setPendingText("");
-    } catch {}
-  }
-
-  function importFromHash() {
-    const m = location.hash.match(/#brcfg=([^&]+)/i);
-    if (!m) return;
-    try {
-      const obj = decodeState<SharedConfig>(m[1]);
-      applyFromObject(obj);
     } catch {}
   }
 
@@ -111,8 +105,13 @@ export default function ConfigShare({
   }
 
   useEffect(() => {
-    importFromHash();
-  }, []);
+    const m = location.hash.match(/#brcfg=([^&]+)/i);
+    if (!m) return;
+    try {
+      const obj = decodeState<SharedConfig>(m[1]);
+      applyFromObject(obj);
+    } catch {}
+  }, [applyFromObject]);
 
   return (
     <section className="panel">

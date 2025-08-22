@@ -62,7 +62,7 @@ export default function ProvidersManager({ onChange }: { onChange?: (arr: Custom
     const ok = isValidHttpUrl(url);
     setOpdsErr(ok ? "" : t("pm.err.url"));
     if (!ok) return;
-    if (providers.some((p) => p.type === "opds" && (p as any).url === url)) return;
+    if (providers.some((p) => p.type === "opds" && p.url === url)) return;
     setProviders([{ type: "opds", url }, ...providers]);
     setOpdsUrl("");
     setOpdsErr("");
@@ -87,7 +87,7 @@ export default function ProvidersManager({ onChange }: { onChange?: (arr: Custom
       authorSelector: scrAuthor.trim() || undefined,
       yearSelector: scrYear.trim() || undefined,
     };
-    if (providers.some((p) => p.type === "scrape" && (p as any).name === name)) return;
+    if (providers.some((p) => p.type === "scrape" && p.name === name)) return;
     setProviders([cfg, ...providers]);
     setScrName("");
     setScrUrl("");
@@ -106,9 +106,20 @@ export default function ProvidersManager({ onChange }: { onChange?: (arr: Custom
   };
 
   const opdsDisabled = !isValidHttpUrl(opdsUrl.trim());
-  const scrDisabled = !scrName.trim() || !isValidHttpUrl(scrUrl.trim()) || !scrRoot.trim() || !scrTitle.trim() || !scrHref.trim();
+  const scrDisabled =
+    !scrName.trim() ||
+    !isValidHttpUrl(scrUrl.trim()) ||
+    !scrRoot.trim() ||
+    !scrTitle.trim() ||
+    !scrHref.trim();
 
-  const listKey = useMemo(() => providers.map((p) => (p.type === "opds" ? `opds:${(p as any).url}` : `scrape:${(p as any).name}`)).join("|"), [providers]);
+  const listKey = useMemo(
+    () =>
+      providers
+        .map((p) => (p.type === "opds" ? `opds:${p.url}` : `scrape:${p.name}`))
+        .join("|"),
+    [providers]
+  );
 
   return (
     <section className="mt-4">
@@ -151,7 +162,11 @@ export default function ProvidersManager({ onChange }: { onChange?: (arr: Custom
           />
           {opdsErr ? <p id="opds-err" className="text-xs text-red-600">{opdsErr}</p> : null}
           <div className="flex items-center gap-2">
-            <button onClick={addOpds} disabled={opdsDisabled} className={`btn-primary btn-sm ${opdsDisabled ? "opacity-60 cursor-not-allowed" : ""}`}>
+            <button
+              onClick={addOpds}
+              disabled={opdsDisabled}
+              className={`btn-primary btn-sm ${opdsDisabled ? "opacity-60 cursor-not-allowed" : ""}`}
+            >
               {t("pm.opds.add")}
             </button>
             <span className="text-xs text-muted">{t("pm.opds.note")}</span>
@@ -190,32 +205,40 @@ export default function ProvidersManager({ onChange }: { onChange?: (arr: Custom
 
           {scrErrReq ? <p className="text-xs text-red-600">{scrErrReq}</p> : null}
 
-          <button onClick={addScraper} disabled={scrDisabled} className={`btn-primary btn-sm ${scrDisabled ? "opacity-60 cursor-not-allowed" : ""}`}>
+          <button
+            onClick={addScraper}
+            disabled={scrDisabled}
+            className={`btn-primary btn-sm ${scrDisabled ? "opacity-60 cursor-not-allowed" : ""}`}
+          >
             {t("pm.scr.add")}
           </button>
         </div>
       )}
 
       <ul key={listKey} className="mt-3 grid gap-2">
-        {providers.length === 0 ? null : providers.map((p, i) => (
-          <li key={`${p.type}:${i}`} className="card flex items-center justify-between gap-3">
-            <div className="text-sm">
-              {p.type === "opds" ? (
-                <>
-                  <span className="chip">OPDS</span>{" "}
-                  <code className="text-xs break-all">{(p as any).url}</code>
-                </>
-              ) : (
-                <>
-                  <span className="chip">Scraper</span>{" "}
-                  <span className="font-medium">{(p as any).name}</span>{" "}
-                  <span className="text-xs text-muted">— {(p as any).searchUrlTemplate}</span>
-                </>
-              )}
-            </div>
-            <button className="btn btn-sm" onClick={() => removeAt(i)}>{t("common.remove")}</button>
-          </li>
-        ))}
+        {providers.length === 0
+          ? null
+          : providers.map((p, i) => (
+              <li key={`${p.type}:${i}`} className="card flex items-center justify-between gap-3">
+                <div className="text-sm">
+                  {p.type === "opds" ? (
+                    <>
+                      <span className="chip">OPDS</span>{" "}
+                      <code className="text-xs break-all">{p.url}</code>
+                    </>
+                  ) : (
+                    <>
+                      <span className="chip">Scraper</span>{" "}
+                      <span className="font-medium">{p.name}</span>{" "}
+                      <span className="text-xs text-muted">— {p.searchUrlTemplate}</span>
+                    </>
+                  )}
+                </div>
+                <button className="btn btn-sm" onClick={() => removeAt(i)}>
+                  {t("common.remove")}
+                </button>
+              </li>
+            ))}
       </ul>
     </section>
   );
