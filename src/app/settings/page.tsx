@@ -16,7 +16,7 @@ export default function SettingsPage() {
     <div className="mx-auto max-w-4xl px-4 py-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
       <div className="mb-10 pb-6 border-b border-border">
         <Link 
-          href={"/" as any} 
+          href="/" 
           className="btn-ghost btn-sm w-fit pl-0 hover:bg-transparent hover:text-primary transition-colors mb-4"
         >
           <ArrowLeft size={16} className="mr-1" />
@@ -126,7 +126,7 @@ export default function SettingsPage() {
           <Shield size={20} className="text-muted-foreground mt-0.5 shrink-0" />
           <div className="text-xs text-muted-foreground">
             <strong className="block text-foreground mb-1">Privacidade & Segurança</strong>
-            O BiblioRadar funciona inteiramente no seu navegador ("Local-First"). 
+            O BiblioRadar funciona inteiramente no seu navegador (&quot;Local-First&quot;). 
             Não rastreamos suas buscas.
           </div>
         </div>

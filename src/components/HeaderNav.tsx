@@ -7,6 +7,7 @@ import { useLibrary } from "@/lib/useLibrary";
 import { useEffect, useState } from "react";
 import { Library, Settings, Search, BookOpen, Home } from "lucide-react";
 import { usePathname } from "next/navigation";
+import type { Route } from "next";
 
 export default function HeaderNav() {
   const { items } = useLibrary();
@@ -29,7 +30,7 @@ export default function HeaderNav() {
       <div className="mx-auto max-w-5xl">
         <nav className="relative flex items-center justify-between rounded-full border border-border/40 bg-background/80 px-4 py-2 shadow-sm backdrop-blur-md supports-[backdrop-filter]:bg-background/60">
           
-          <Link href={"/" as any} className="group flex items-center gap-2 outline-none">
+          <Link href="/" className="group flex items-center gap-2 outline-none">
             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground transition-transform group-hover:scale-110 group-active:scale-95">
               <BookOpen size={16} />
             </div>
@@ -65,10 +66,10 @@ export default function HeaderNav() {
   );
 }
 
-function NavItem({ href, active, icon, label, count }: { href: string; active: boolean; icon: React.ReactNode; label: string; count?: number }) {
+function NavItem({ href, active, icon, label, count }: { href: Route<string> | URL; active: boolean; icon: React.ReactNode; label: string; count?: number }) {
   return (
     <Link 
-      href={href as any} 
+      href={href} 
       className={`group relative flex h-9 items-center justify-center gap-2 rounded-full px-3 transition-all duration-200 outline-none ${active ? "bg-primary/10 text-primary font-medium" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}
     >
       <span className="relative">

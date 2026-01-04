@@ -29,7 +29,7 @@ export function useSettings() {
     }
   }, []);
 
-  const updateSetting = (key: keyof Settings, value: any) => {
+  const updateSetting = (key: keyof Settings, value: Settings[typeof key]) => {
     const newSettings = { ...settings, [key]: value };
     setSettings(newSettings);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(newSettings));

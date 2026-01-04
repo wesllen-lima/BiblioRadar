@@ -63,7 +63,6 @@ export default function HomePage() {
     }
 
     // LÓGICA DE IDIOMA CORRIGIDA
-    // 1. Query Nativa (Open Library/Archive): Recebe o filtro de idioma
     let nativeQuery = query;
     if (settings.searchLanguage !== "all") {
       const langMap: Record<string, string> = { "pt": "portuguese", "en": "english", "es": "spanish" };
@@ -71,7 +70,6 @@ export default function HomePage() {
       nativeQuery += ` language:${langTerm}`;
     }
 
-    // 2. Query Custom (Scrapers/OPDS): Recebe a query LIMPA para não quebrar a busca
     const customQuery = query;
 
     const sig = customProviders.map(p => (p.type === "opds" ? p.url : p.name)).sort().join(",");
@@ -93,7 +91,6 @@ export default function HomePage() {
     setByProvider({});
 
     try {
-      // API Interna usa nativeQuery
       const fetchBase = fetch(`/api/search?q=${encodeURIComponent(nativeQuery)}&onlyPdf=${pdfOnly ? 1 : 0}`, { signal })
         .then(r => r.json())
         .then(d => { 
@@ -102,7 +99,6 @@ export default function HomePage() {
         })
         .catch(() => []);
       
-      // Scrapers usam customQuery (LIMPA)
       const customPromises = customProviders.map(async (p) => {
         if (signal.aborted) return [];
         try {
@@ -237,7 +233,8 @@ export default function HomePage() {
                       Verifique a ortografia ou tente remover o filtro de PDF.
                       {settings.searchLanguage !== "all" && (
                         <span className="block mt-2 text-primary font-medium">
-                          Filtro de idioma ativo: {settings.searchLanguage.toUpperCase()}. Tente mudar para "Global".
+                          {/* CORRIGIDO AQUI: Aspas substituídas por &quot; */}
+                          Filtro de idioma ativo: {settings.searchLanguage.toUpperCase()}. Tente mudar para &quot;Global&quot; nas configurações.
                         </span>
                       )}
                     </p>

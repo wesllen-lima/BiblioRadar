@@ -5,11 +5,11 @@ import BookCard from "@/components/BookCard";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { ArrowLeft, BookHeart, Search, Heart } from "lucide-react";
-import { useI18n } from "@/components/I18nProvider"; // Importar i18n
+import { useI18n } from "@/components/I18nProvider";
 
 export default function LibraryPage() {
   const { items, isLoaded } = useLibrary();
-  const { t } = useI18n(); // Usar hook
+  const { t } = useI18n();
   const [mounted, setMounted] = useState(false);
   
   useEffect(() => setMounted(true), []);
@@ -17,8 +17,8 @@ export default function LibraryPage() {
   if (!mounted || !isLoaded) {
     return (
       <div className="py-12 space-y-4 max-w-2xl mx-auto px-4">
-        <div className="h-8 w-48 bg-shimmer rounded animate-pulse"></div>
-        <div className="h-32 w-full bg-shimmer rounded animate-pulse"></div>
+        <div className="h-8 w-48 bg-muted/50 rounded animate-pulse"></div>
+        <div className="h-32 w-full bg-muted/50 rounded animate-pulse"></div>
       </div>
     );
   }
@@ -38,7 +38,7 @@ export default function LibraryPage() {
           </p>
         </div>
         <Link 
-          href={"/" as any} 
+          href="/" 
           className="btn-ghost h-9 gap-2 px-3 text-muted-foreground hover:text-foreground self-start sm:self-auto"
         >
           <ArrowLeft size={16} />
@@ -55,7 +55,7 @@ export default function LibraryPage() {
           <p className="text-muted-foreground mb-6 max-w-sm text-sm leading-relaxed">
             {t("library.emptyDesc")} <Heart size={14} className="inline text-red-500 fill-red-500 mx-1"/>
           </p>
-          <Link href={"/" as any} className="btn-primary gap-2">
+          <Link href="/" className="btn-primary gap-2">
             <Search size={16} />
             {t("search.placeholder").split("(")[0]}
           </Link>

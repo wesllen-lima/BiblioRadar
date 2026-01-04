@@ -5,16 +5,15 @@ import { gutenberg } from "@/lib/providers/gutenberg";
 import { internetArchive } from "@/lib/providers/internetArchive";
 import { openLibrary } from "@/lib/providers/openLibrary";
 import { mergeAndDedupe } from "@/lib/aggregate";
+import type { BookResult } from "@/lib/types";
 
-// Cache na CDN por 1 hora (3600s), revalida em background
 export const revalidate = 3600; 
 
-async function searchSafe(name: string, p: Promise<any[]>) {
+async function searchSafe(name: string, p: Promise<BookResult[]>) {
   try {
-    // Timeout de 5s por provedor para não travar a request inteira
     return await Promise.race([
       p,
-      new Promise<any[]>((_, rej) => setTimeout(() => rej(new Error("Timeout")), 5000))
+      new Promise<BookResult[]>((_, rej) => setTimeout(() => rej(new Error("Timeout")), 5000))
     ]);
   } catch (e) {
     console.warn(`Provider ${name} failed:`, e);
@@ -28,7 +27,6 @@ export async function GET(req: NextRequest) {
   
   if (!q) return NextResponse.json({ results: [], providers: [] });
 
-  // Executa todos em paralelo, sem falhar se um cair
   const results = await Promise.allSettled([
     searchSafe("gutenberg", gutenberg.search(q)),
     searchSafe("archive", internetArchive.search(q)),
@@ -36,7 +34,7 @@ export async function GET(req: NextRequest) {
   ]);
 
   const flatResults = results
-    .filter((r): r is PromiseFulfilledResult<any[]> => r.status === "fulfilled")
+    .filter((r): r is PromiseFulfilledResult<BookResult[]> => r.status === "fulfilled")
     .flatMap(r => r.value);
 
   let merged = mergeAndDedupe(flatResults);
@@ -51,7 +49,6 @@ export async function GET(req: NextRequest) {
       providers: ["gutenberg", "internet_archive", "open_library"] 
     },
     {
-      // Headers para cache eficiente no navegador e Vercel Edge
       headers: {
         "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=600"
       }

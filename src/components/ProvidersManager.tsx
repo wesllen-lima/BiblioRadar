@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useI18n } from "@/components/I18nProvider";
 import { writeJSONCookie, readJSONCookie } from "@/lib/cookieStore";
 import { Plus, Trash2, Rss, Globe, Code } from "lucide-react";

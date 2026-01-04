@@ -34,13 +34,10 @@ export function I18nProvider({ initialLocale, children }: { initialLocale: Local
       targetLocale = pickLocale(ck);
     }
 
-    if (targetLocale !== locale) {
-      setLocale(targetLocale);
-    }
-
+    setLocale(targetLocale);
     document.documentElement.setAttribute("lang", targetLocale);
     
-  }, []);
+  }, [initialLocale]);
 
   const t = useCallback(
     (key: string, params?: Record<string, unknown>) => format(dict[key] ?? key, params),

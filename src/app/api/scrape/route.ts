@@ -5,7 +5,18 @@ import * as cheerio from "cheerio";
 import { z } from "zod";
 import { isSafeUrl } from "@/lib/security";
 
-// Validação rigorosa da entrada
+// Definição de tipo para evitar "any"
+interface ScrapeResult {
+  id: string;
+  source: string;
+  title: string;
+  authors: string[];
+  cover?: string;
+  pdfUrl?: string;
+  readUrl: string;
+  year?: string;
+}
+
 const schema = z.object({
   q: z.string().trim().min(1).max(200),
   config: z.object({
@@ -17,6 +28,7 @@ const schema = z.object({
     linkSelector: z.string().min(1),
     authorSelector: z.string().optional(),
     coverSelector: z.string().optional(),
+    yearSelector: z.string().optional(),
   }),
 });
 
@@ -35,19 +47,31 @@ export async function POST(req: NextRequest) {
     }
 
     const { q, config } = parsed.data;
-    const targetUrl = config.searchUrlTemplate.replace(/\{query\}/g, encodeURIComponent(q));
+    
+    // Suporte a placeholders variados para maior compatibilidade
+    let targetUrl = config.searchUrlTemplate;
+    if (targetUrl.includes("{query}")) {
+      targetUrl = targetUrl.replace(/\{query\}/g, encodeURIComponent(q));
+    } else if (targetUrl.includes("{plus}")) {
+      targetUrl = targetUrl.replace(/\{plus\}/g, q.trim().replace(/\s+/g, "+"));
+    } else if (targetUrl.includes("{raw}")) {
+      targetUrl = targetUrl.replace(/\{raw\}/g, q);
+    } else {
+      // Fallback padrão se nenhum placeholder for encontrado
+      const separator = targetUrl.includes("?") ? "&" : "?";
+      targetUrl = `${targetUrl}${separator}q=${encodeURIComponent(q)}`;
+    }
 
-    // PROTEÇÃO SSRF: Verifica se a URL gerada é segura antes de acessar
     if (!isSafeUrl(targetUrl)) {
       console.warn(`Blocked unsafe URL attempt: ${targetUrl}`);
       return NextResponse.json({ results: [] }, { status: 403 });
     }
 
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000); // 8s timeout
+    const timeout = setTimeout(() => controller.abort(), 10000); // 10s timeout (aumentado levemente)
 
     const res = await fetch(targetUrl, {
-      headers: { "User-Agent": "Mozilla/5.0 (compatible; BiblioRadar/1.0)" },
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; BiblioRadar/1.0; +http://biblioradar.vercel.app)" },
       signal: controller.signal,
     });
     clearTimeout(timeout);
@@ -56,11 +80,10 @@ export async function POST(req: NextRequest) {
 
     const html = await res.text();
     const $ = cheerio.load(html);
-    const items: any[] = [];
-    const $items = $(config.itemSelector);
+    const items: ScrapeResult[] = [];
     
-    // Fallback inteligente se o seletor principal falhar
-    const candidates = $items.length > 0 ? $items : $("a[href$='.pdf']").parent();
+    const $items = $(config.itemSelector);
+    const candidates = $items.length > 0 ? $items : $("body").find("a[href$='.pdf']").parent();
 
     candidates.slice(0, 40).each((_, el) => {
       const $el = $(el);
@@ -84,23 +107,32 @@ export async function POST(req: NextRequest) {
         ? $el.find(config.coverSelector).attr("src") 
         : undefined;
 
+      const year = config.yearSelector
+        ? $el.find(config.yearSelector).first().text().trim()
+        : undefined;
+
       const isPdf = /\.pdf(\?|#|$)/i.test(fullHref);
 
+      // Gera um ID determinístico baseado na URL para evitar duplicatas no frontend
+      const idHash = Buffer.from(fullHref).toString('base64').replace(/=/g, '').slice(0, 16);
+
       items.push({
-        id: `scrape:${config.name}:${Buffer.from(fullHref).toString('base64').slice(0,12)}`,
+        id: `scrape:${config.name.toLowerCase().replace(/\s+/g, '-')}:${idHash}`,
         source: "scrape",
         title,
         authors: author ? [author] : [],
         cover: absoluteUrl(targetUrl, coverSrc),
         pdfUrl: isPdf ? fullHref : undefined,
         readUrl: fullHref,
+        year: year?.slice(0, 4), // Tenta pegar apenas o ano se possível
       });
     });
 
     return NextResponse.json({ results: items });
 
   } catch (error) {
-    console.error("Scrape error:", error);
-    return NextResponse.json({ results: [] }); // Retorna vazio gracefully
+    const msg = error instanceof Error ? error.message : "Unknown error";
+    console.error("Scrape error:", msg);
+    return NextResponse.json({ results: [] });
   }
 }

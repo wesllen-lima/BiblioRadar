@@ -4,7 +4,7 @@ import type { BookResult } from "@/lib/types";
 import Image from "next/image";
 import { useLibrary } from "@/lib/useLibrary";
 import CitationModal from "./CitationModal";
-import { Download, Heart, Quote, BookOpen, ExternalLink, ShieldAlert, Globe } from "lucide-react";
+import { Download, Heart, Quote, BookOpen, ShieldAlert, Globe } from "lucide-react";
 import { toast } from "sonner";
 import { useI18n } from "./I18nProvider";
 

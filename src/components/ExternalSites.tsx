@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ExternalLink, Globe, Search, ArrowUpRight } from "lucide-react";
+import { Globe, Search, ArrowUpRight } from "lucide-react";
 import { useI18n } from "@/components/I18nProvider";
 import { useSettings } from "@/lib/useSettings";
 import { getSmartUrl, getFaviconUrl } from "@/lib/smartLinks";
+/* eslint-disable @next/next/no-img-element */
 
 type Site = { name: string; url: string };
 
@@ -17,16 +18,15 @@ const DEFAULT_SITES: Site[] = [
 ];
 
 export default function ExternalSites({ 
-  currentQuery,
-  onManageClick 
+  currentQuery
 }: { 
   currentQuery: string;
   onManageClick?: () => void;
 }) {
-  const { t } = useI18n();
+  const {} = useI18n();
   const { settings } = useSettings();
   const [sites, setSites] = useState<Site[]>([]);
-  const [isUsingDefaults, setIsUsingDefaults] = useState(false);
+  const [, setIsUsingDefaults] = useState(false);
 
   useEffect(() => {
     const load = () => {
@@ -52,7 +52,6 @@ export default function ExternalSites({
 
   return (
     <div className="mt-12 pt-8 border-t border-border animate-in fade-in slide-in-from-bottom-2">
-      
       <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-6 gap-2">
         <div>
           <h3 className="text-lg font-bold flex items-center gap-2 text-foreground">
@@ -60,7 +59,7 @@ export default function ExternalSites({
             Busca Profunda (Web)
           </h3>
           <p className="text-sm text-muted-foreground mt-1">
-            Pesquisar "<strong>{currentQuery}</strong>" diretamente nas fontes originais:
+            Pesquisar &quot;<strong>{currentQuery}</strong>&quot; diretamente nas fontes originais:
           </p>
         </div>
         
@@ -105,11 +104,10 @@ export default function ExternalSites({
                 </div>
                 
                 <span className="block text-[11px] text-muted-foreground truncate opacity-70 group-hover:opacity-100 font-mono">
-                  {new URL(smartUrl).hostname.replace("www.", "")}
+                  {/* Safe URL parse */}
+                  {(() => { try { return new URL(smartUrl).hostname.replace("www.", ""); } catch { return ""; } })()}
                 </span>
               </div>
-
-              <title>{`Abrir pesquisa em: ${smartUrl}`}</title>
             </a>
           );
         })}

@@ -63,7 +63,7 @@ export async function GET(req: NextRequest) {
     const info = await doHead(targetUrl, controller.signal);
     clearTimeout(t);
     return NextResponse.json(info);
-  } catch (error) {
+  } catch {
     clearTimeout(t);
     // Retorna status 0 ou 408 em caso de erro/timeout
     return NextResponse.json<HeadInfo>({ ok: false, status: 0 });
