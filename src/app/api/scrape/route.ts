@@ -1,138 +1,106 @@
 export const runtime = "nodejs";
 
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import * as cheerio from "cheerio";
+import { z } from "zod";
+import { isSafeUrl } from "@/lib/security";
 
-type ScrapeConfig = {
-  type: "scrape";
-  name: string;
-  searchUrlTemplate: string;
-  itemSelector: string;
-  titleSelector?: string;
-  linkSelector: string;
-  authorSelector?: string;
-  coverSelector?: string;
-};
-
-type ScrapedItem = {
-  id: string;
-  source: "scrape";
-  title: string;
-  authors: string[];
-  cover?: string;
-  pdfUrl?: string;
-  readUrl?: string;
-};
+// Validação rigorosa da entrada
+const schema = z.object({
+  q: z.string().trim().min(1).max(200),
+  config: z.object({
+    type: z.literal("scrape"),
+    name: z.string(),
+    searchUrlTemplate: z.string().url(),
+    itemSelector: z.string().min(1),
+    titleSelector: z.string().optional(),
+    linkSelector: z.string().min(1),
+    authorSelector: z.string().optional(),
+    coverSelector: z.string().optional(),
+  }),
+});
 
 function absoluteUrl(base: string, href?: string | null) {
   if (!href) return undefined;
-  try {
-    return new URL(href, base).toString();
-  } catch {
-    return undefined;
-  }
-}
-
-function buildSearchUrl(tpl: string, q: string) {
-  return tpl.replace(/\{query\}/g, encodeURIComponent(q));
+  try { return new URL(href, base).toString(); } catch { return undefined; }
 }
 
 export async function POST(req: NextRequest) {
-  let body: { q: string; config: ScrapeConfig };
   try {
-    body = await req.json();
-  } catch {
-    return new Response("Invalid JSON", { status: 400 });
-  }
+    const body = await req.json();
+    const parsed = schema.safeParse(body);
 
-  const q = typeof body?.q === "string" ? body.q : "";
-  const config = body?.config as ScrapeConfig | undefined;
+    if (!parsed.success) {
+      return NextResponse.json({ results: [] }, { status: 400 });
+    }
 
-  if (!q || !config || config.type !== "scrape") {
-    return new Response("Missing q/config", { status: 400 });
-  }
+    const { q, config } = parsed.data;
+    const targetUrl = config.searchUrlTemplate.replace(/\{query\}/g, encodeURIComponent(q));
 
-  const url = buildSearchUrl(config.searchUrlTemplate, q);
+    // PROTEÇÃO SSRF: Verifica se a URL gerada é segura antes de acessar
+    if (!isSafeUrl(targetUrl)) {
+      console.warn(`Blocked unsafe URL attempt: ${targetUrl}`);
+      return NextResponse.json({ results: [] }, { status: 403 });
+    }
 
-  const controller = new AbortController();
-  const to = setTimeout(() => controller.abort(), 7000);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000); // 8s timeout
 
-  try {
-    const res = await fetch(url, {
-      headers: { "user-agent": "Mozilla/5.0 (compatible; PDFBooksFinder/1.0)" },
+    const res = await fetch(targetUrl, {
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; BiblioRadar/1.0)" },
       signal: controller.signal,
     });
-    clearTimeout(to);
+    clearTimeout(timeout);
 
-    if (!res.ok) {
-      return new Response(JSON.stringify({ results: [] }), {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      });
-    }
+    if (!res.ok) throw new Error(`Status ${res.status}`);
 
     const html = await res.text();
     const $ = cheerio.load(html);
-
-    const items: ScrapedItem[] = [];
+    const items: any[] = [];
     const $items = $(config.itemSelector);
+    
+    // Fallback inteligente se o seletor principal falhar
+    const candidates = $items.length > 0 ? $items : $("a[href$='.pdf']").parent();
 
-    const candidates =
-      $items.length > 0 ? $items.toArray() : $("a[href$='.pdf']").toArray();
-
-    for (const el of candidates) {
+    candidates.slice(0, 40).each((_, el) => {
       const $el = $(el);
+      
+      const rawLink = config.linkSelector 
+        ? $el.find(config.linkSelector).first().attr("href") 
+        : $el.is("a") ? $el.attr("href") : $el.find("a").first().attr("href");
 
-      const title =
-        (config.titleSelector
-          ? $el.find(config.titleSelector).first().text().trim()
-          : ($el.attr("title") || $el.text() || "").trim()) || "Sem título";
+      const fullHref = absoluteUrl(targetUrl, rawLink);
+      if (!fullHref) return;
 
-      const href =
-        (config.linkSelector
-          ? $el.find(config.linkSelector).first().attr("href")
-          : $el.is("a")
-          ? $el.attr("href")
-          : undefined) || undefined;
+      const title = (config.titleSelector 
+        ? $el.find(config.titleSelector).first().text() 
+        : $el.attr("title") || $el.text()).trim() || "Sem título";
 
-      const base = url;
-      const fullHref = absoluteUrl(base, href);
-
-      const isPdf = !!fullHref && /\.pdf(\?|#|$)/i.test(fullHref);
-
-      const author = config.authorSelector
-        ? $el.find(config.authorSelector).first().text().trim()
+      const author = config.authorSelector 
+        ? $el.find(config.authorSelector).first().text().trim() 
         : "";
 
-      const cover = config.coverSelector
-        ? absoluteUrl(
-            base,
-            $el.find(config.coverSelector).first().attr("src") || undefined
-          )
+      const coverSrc = config.coverSelector 
+        ? $el.find(config.coverSelector).attr("src") 
         : undefined;
 
+      const isPdf = /\.pdf(\?|#|$)/i.test(fullHref);
+
       items.push({
-        id: `scrape:${config.name}:${fullHref || title}:${Math.random()
-          .toString(36)
-          .slice(2, 8)}`,
+        id: `scrape:${config.name}:${Buffer.from(fullHref).toString('base64').slice(0,12)}`,
         source: "scrape",
         title,
         authors: author ? [author] : [],
-        cover,
+        cover: absoluteUrl(targetUrl, coverSrc),
         pdfUrl: isPdf ? fullHref : undefined,
-        readUrl: isPdf ? fullHref : fullHref,
+        readUrl: fullHref,
       });
-
-      if (items.length >= 50) break;
-    }
-
-    return new Response(JSON.stringify({ results: items }), {
-      headers: { "content-type": "application/json" },
     });
-  } catch {
-    return new Response(JSON.stringify({ results: [] }), {
-      headers: { "content-type": "application/json" },
-      status: 200,
-    });
+
+    return NextResponse.json({ results: items });
+
+  } catch (error) {
+    console.error("Scrape error:", error);
+    return NextResponse.json({ results: [] }); // Retorna vazio gracefully
   }
 }

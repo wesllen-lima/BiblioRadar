@@ -9,24 +9,37 @@ type Ctx = {
   setLocale: (loc: Locale) => void;
 };
 
-const I18nCtx = createContext<Ctx>({ locale: DEFAULT_LOCALE, t: (k) => k, setLocale: () => {} });
+const I18nCtx = createContext<Ctx>({ 
+  locale: DEFAULT_LOCALE, 
+  t: (k) => k, 
+  setLocale: () => {} 
+});
 
 export function I18nProvider({ initialLocale, children }: { initialLocale: Locale; children: React.ReactNode }) {
   const [locale, setLocale] = useState<Locale>(initialLocale);
+
   const dict = DICTS[locale] ?? DICTS[DEFAULT_LOCALE];
 
   useEffect(() => {
     const ck = getCookie("br_lang");
+    
+    let targetLocale = initialLocale;
+
     if (!ck) {
       const nav = typeof navigator !== "undefined" ? navigator.language : "";
-      const picked = pickLocale(nav);
-      setLocale((prev) => (prev !== picked ? picked : prev));
-      setCookie("br_lang", picked);
-      document.documentElement.setAttribute("lang", picked);
+      targetLocale = pickLocale(nav);
+      
+      setCookie("br_lang", targetLocale);
     } else {
-      const picked = pickLocale(ck);
-      document.documentElement.setAttribute("lang", picked);
+      targetLocale = pickLocale(ck);
     }
+
+    if (targetLocale !== locale) {
+      setLocale(targetLocale);
+    }
+
+    document.documentElement.setAttribute("lang", targetLocale);
+    
   }, []);
 
   const t = useCallback(

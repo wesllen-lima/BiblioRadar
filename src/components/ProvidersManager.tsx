@@ -2,9 +2,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { useI18n } from "@/components/I18nProvider";
 import { writeJSONCookie, readJSONCookie } from "@/lib/cookieStore";
+import { Plus, Trash2, Rss, Globe, Code } from "lucide-react";
 
 export type CustomProvider =
-  | { type: "opds"; url: string }
+  | { type: "opds"; url: string; name?: string }
   | {
       type: "scrape";
       name: string;
@@ -32,9 +33,12 @@ export default function ProvidersManager({ onChange }: { onChange?: (arr: Custom
   const { t } = useI18n();
   const [tab, setTab] = useState<"opds" | "scraper">("opds");
   const [providers, setProviders] = useState<CustomProvider[]>([]);
+  
+  // OPDS State
   const [opdsUrl, setOpdsUrl] = useState("");
   const [opdsErr, setOpdsErr] = useState("");
 
+  // Scraper State
   const [scrName, setScrName] = useState("");
   const [scrUrl, setScrUrl] = useState("");
   const [scrRoot, setScrRoot] = useState("");
@@ -55,6 +59,8 @@ export default function ProvidersManager({ onChange }: { onChange?: (arr: Custom
   useEffect(() => {
     writeJSONCookie(CK, providers);
     onChange?.(providers);
+    // Dispara evento para atualizar outras partes do app (como o sidebar)
+    window.dispatchEvent(new Event("providers-updated"));
   }, [providers, onChange]);
 
   const addOpds = () => {
@@ -63,7 +69,11 @@ export default function ProvidersManager({ onChange }: { onChange?: (arr: Custom
     setOpdsErr(ok ? "" : t("pm.err.url"));
     if (!ok) return;
     if (providers.some((p) => p.type === "opds" && p.url === url)) return;
-    setProviders([{ type: "opds", url }, ...providers]);
+    
+    // Tenta extrair um nome amigável da URL
+    const name = url.replace(/^https?:\/\//, "").split("/")[0];
+    
+    setProviders([{ type: "opds", url, name }, ...providers]);
     setOpdsUrl("");
     setOpdsErr("");
   };
@@ -89,16 +99,8 @@ export default function ProvidersManager({ onChange }: { onChange?: (arr: Custom
     };
     if (providers.some((p) => p.type === "scrape" && p.name === name)) return;
     setProviders([cfg, ...providers]);
-    setScrName("");
-    setScrUrl("");
-    setScrRoot("");
-    setScrTitle("");
-    setScrHref("");
-    setScrCover("");
-    setScrAuthor("");
-    setScrYear("");
-    setScrErrUrl("");
-    setScrErrReq("");
+    setScrName(""); setScrUrl(""); setScrRoot(""); setScrTitle(""); setScrHref("");
+    setScrCover(""); setScrAuthor(""); setScrYear(""); setScrErrUrl(""); setScrErrReq("");
   };
 
   const removeAt = (i: number) => {
@@ -106,140 +108,144 @@ export default function ProvidersManager({ onChange }: { onChange?: (arr: Custom
   };
 
   const opdsDisabled = !isValidHttpUrl(opdsUrl.trim());
-  const scrDisabled =
-    !scrName.trim() ||
-    !isValidHttpUrl(scrUrl.trim()) ||
-    !scrRoot.trim() ||
-    !scrTitle.trim() ||
-    !scrHref.trim();
-
-  const listKey = useMemo(
-    () =>
-      providers
-        .map((p) => (p.type === "opds" ? `opds:${p.url}` : `scrape:${p.name}`))
-        .join("|"),
-    [providers]
-  );
+  const scrDisabled = !scrName.trim() || !isValidHttpUrl(scrUrl.trim()) || !scrRoot.trim() || !scrTitle.trim() || !scrHref.trim();
 
   return (
-    <section className="mt-4">
-      <h2 className="text-base font-semibold mb-2">{t("pm.title")}</h2>
-
-      <div className="toolbar w-full mb-3">
-        <div className="flex gap-1">
-          <button
-            type="button"
-            className={`btn-sm ${tab === "opds" ? "btn-primary" : "btn-ghost"}`}
-            onClick={() => setTab("opds")}
-          >
-            {t("pm.tab.opds")}
-          </button>
-          <button
-            type="button"
-            className={`btn-sm ${tab === "scraper" ? "btn-primary" : "btn-ghost"}`}
-            onClick={() => setTab("scraper")}
-          >
-            {t("pm.tab.scraper")}
-          </button>
-        </div>
+    <section className="space-y-6">
+      {/* Tabs */}
+      <div className="flex p-1 bg-muted/50 rounded-lg w-fit">
+        <button
+          type="button"
+          className={`px-4 py-1.5 text-sm font-medium rounded-md transition-all ${tab === "opds" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+          onClick={() => setTab("opds")}
+        >
+          {t("pm.tab.opds")}
+        </button>
+        <button
+          type="button"
+          className={`px-4 py-1.5 text-sm font-medium rounded-md transition-all ${tab === "scraper" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+          onClick={() => setTab("scraper")}
+        >
+          {t("pm.tab.scraper")}
+        </button>
       </div>
 
-      {tab === "opds" ? (
-        <div className="card space-y-2">
-          <input
-            value={opdsUrl}
-            onChange={(e) => {
-              setOpdsUrl(e.target.value);
-              if (opdsErr) setOpdsErr("");
-            }}
-            onBlur={() => {
-              if (!isValidHttpUrl(opdsUrl.trim())) setOpdsErr(t("pm.err.url"));
-            }}
-            placeholder={t("pm.opds.placeholder")}
-            aria-invalid={!!opdsErr}
-            aria-describedby={opdsErr ? "opds-err" : undefined}
-            className={`field ${opdsErr ? "border-red-500 focus-visible:outline-red-500" : ""}`}
-          />
-          {opdsErr ? <p id="opds-err" className="text-xs text-red-600">{opdsErr}</p> : null}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={addOpds}
-              disabled={opdsDisabled}
-              className={`btn-primary btn-sm ${opdsDisabled ? "opacity-60 cursor-not-allowed" : ""}`}
-            >
-              {t("pm.opds.add")}
-            </button>
-            <span className="text-xs text-muted">{t("pm.opds.note")}</span>
-          </div>
-        </div>
-      ) : (
-        <div className="card space-y-2">
-          <input
-            value={scrName}
-            onChange={(e) => setScrName(e.target.value)}
-            placeholder={t("pm.scr.name")}
-            className="field"
-          />
-          <input
-            value={scrUrl}
-            onChange={(e) => {
-              setScrUrl(e.target.value);
-              if (scrErrUrl) setScrErrUrl("");
-            }}
-            onBlur={() => {
-              if (!isValidHttpUrl(scrUrl.trim())) setScrErrUrl(t("pm.err.nameUrl"));
-            }}
-            placeholder={t("pm.scr.url", { query: "{query}", plus: "{plus}", raw: "{raw}" })}
-            aria-invalid={!!scrErrUrl}
-            aria-describedby={scrErrUrl ? "scr-url-err" : undefined}
-            className={`field ${scrErrUrl ? "border-red-500 focus-visible:outline-red-500" : ""}`}
-          />
-          {scrErrUrl ? <p id="scr-url-err" className="text-xs text-red-600">{scrErrUrl}</p> : null}
-
-          <input value={scrRoot} onChange={(e) => setScrRoot(e.target.value)} placeholder={t("pm.scr.sel.root")} className="field" />
-          <input value={scrTitle} onChange={(e) => setScrTitle(e.target.value)} placeholder={t("pm.scr.sel.title")} className="field" />
-          <input value={scrHref} onChange={(e) => setScrHref(e.target.value)} placeholder={t("pm.scr.sel.href")} className="field" />
-          <input value={scrCover} onChange={(e) => setScrCover(e.target.value)} placeholder={t("pm.scr.sel.cover")} className="field" />
-          <input value={scrAuthor} onChange={(e) => setScrAuthor(e.target.value)} placeholder={t("pm.scr.sel.author")} className="field" />
-          <input value={scrYear} onChange={(e) => setScrYear(e.target.value)} placeholder={t("pm.scr.sel.year")} className="field" />
-
-          {scrErrReq ? <p className="text-xs text-red-600">{scrErrReq}</p> : null}
-
-          <button
-            onClick={addScraper}
-            disabled={scrDisabled}
-            className={`btn-primary btn-sm ${scrDisabled ? "opacity-60 cursor-not-allowed" : ""}`}
-          >
-            {t("pm.scr.add")}
-          </button>
-        </div>
-      )}
-
-      <ul key={listKey} className="mt-3 grid gap-2">
-        {providers.length === 0
-          ? null
-          : providers.map((p, i) => (
-              <li key={`${p.type}:${i}`} className="card flex items-center justify-between gap-3">
-                <div className="text-sm">
-                  {p.type === "opds" ? (
-                    <>
-                      <span className="chip">OPDS</span>{" "}
-                      <code className="text-xs break-all">{p.url}</code>
-                    </>
-                  ) : (
-                    <>
-                      <span className="chip">Scraper</span>{" "}
-                      <span className="font-medium">{p.name}</span>{" "}
-                      <span className="text-xs text-muted">— {p.searchUrlTemplate}</span>
-                    </>
-                  )}
-                </div>
-                <button className="btn btn-sm" onClick={() => removeAt(i)}>
-                  {t("common.remove")}
+      {/* Formulários */}
+      <div className="p-5 rounded-xl border border-border bg-muted/20">
+        {tab === "opds" ? (
+          <div className="space-y-4">
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">URL do Feed OPDS</label>
+              <div className="flex gap-2">
+                <input
+                  value={opdsUrl}
+                  onChange={(e) => {
+                    setOpdsUrl(e.target.value);
+                    if (opdsErr) setOpdsErr("");
+                  }}
+                  onBlur={() => { if (!isValidHttpUrl(opdsUrl.trim())) setOpdsErr(t("pm.err.url")); }}
+                  placeholder="https://exemplo.com/opds/feed.xml"
+                  className={`field flex-1 ${opdsErr ? "border-red-500 focus-visible:border-red-500" : ""}`}
+                />
+                <button
+                  onClick={addOpds}
+                  disabled={opdsDisabled}
+                  className="btn-primary"
+                >
+                  {t("pm.opds.add")}
                 </button>
-              </li>
+              </div>
+              {opdsErr && <p className="text-xs text-red-600 mt-1.5">{opdsErr}</p>}
+            </div>
+            <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+              <Rss size={12} />
+              Feeds OPDS são padrões abertos usados por bibliotecas digitais (ex: Standard Ebooks, Project Gutenberg).
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <input value={scrName} onChange={(e) => setScrName(e.target.value)} placeholder={t("pm.scr.name")} className="field" />
+              <input 
+                value={scrUrl} 
+                onChange={(e) => { setScrUrl(e.target.value); if (scrErrUrl) setScrErrUrl(""); }}
+                onBlur={() => { if (!isValidHttpUrl(scrUrl.trim())) setScrErrUrl(t("pm.err.nameUrl")); }}
+                placeholder={t("pm.scr.url")} 
+                className={`field ${scrErrUrl ? "border-red-500" : ""}`}
+              />
+            </div>
+            {scrErrUrl && <p className="text-xs text-red-600">{scrErrUrl}</p>}
+
+            <div className="p-4 rounded-lg bg-background border border-border space-y-3">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-2">
+                <Code size={12} /> Seletores CSS (Obrigatórios)
+              </h4>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <input value={scrRoot} onChange={(e) => setScrRoot(e.target.value)} placeholder="Item Raiz (ex: .book-card)" className="field" />
+                <input value={scrTitle} onChange={(e) => setScrTitle(e.target.value)} placeholder="Título (ex: h3 > a)" className="field" />
+                <input value={scrHref} onChange={(e) => setScrHref(e.target.value)} placeholder="Link (ex: a.download)" className="field" />
+              </div>
+            </div>
+
+            <div className="p-4 rounded-lg bg-background border border-border space-y-3">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Opcionais</h4>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <input value={scrCover} onChange={(e) => setScrCover(e.target.value)} placeholder="Capa (img src)" className="field" />
+                <input value={scrAuthor} onChange={(e) => setScrAuthor(e.target.value)} placeholder="Autor (ex: .author)" className="field" />
+                <input value={scrYear} onChange={(e) => setScrYear(e.target.value)} placeholder="Ano" className="field" />
+              </div>
+            </div>
+
+            {scrErrReq && <p className="text-xs text-red-600">{scrErrReq}</p>}
+
+            <button onClick={addScraper} disabled={scrDisabled} className="btn-primary w-full sm:w-auto">
+              <Plus size={16} />
+              {t("pm.scr.add")}
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Lista de Provedores Ativos */}
+      <div className="space-y-3">
+        <h4 className="text-sm font-semibold text-foreground">Fontes Ativas ({providers.length})</h4>
+        
+        {providers.length === 0 ? (
+          <p className="text-sm text-muted-foreground italic">Nenhuma fonte personalizada adicionada.</p>
+        ) : (
+          <div className="grid gap-2">
+            {providers.map((p, i) => (
+              <div key={`${p.type}:${i}`} className="flex items-center justify-between p-3 rounded-lg border border-border bg-card shadow-sm group hover:border-primary/30 transition-colors">
+                <div className="flex items-center gap-3 overflow-hidden">
+                  <div className={`h-8 w-8 rounded-full flex items-center justify-center ${p.type === "opds" ? "bg-orange-500/10 text-orange-600" : "bg-blue-500/10 text-blue-600"}`}>
+                    {p.type === "opds" ? <Rss size={16} /> : <Globe size={16} />}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium text-sm truncate text-foreground">
+                        {p.name || (p.type === "opds" ? "Feed OPDS" : "Scraper")}
+                      </p>
+                      <span className="text-[10px] font-mono uppercase bg-muted px-1.5 rounded text-muted-foreground border border-border">
+                        {p.type}
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground truncate opacity-70 font-mono">
+                      {p.type === "opds" ? p.url : p.searchUrlTemplate}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => removeAt(i)}
+                  className="btn-icon text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                  title={t("common.remove")}
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
             ))}
-      </ul>
+          </div>
+        )}
+      </div>
     </section>
   );
 }

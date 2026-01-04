@@ -1,81 +1,139 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+
+import { useState, useEffect } from "react";
+import { Plus, Trash2, Globe, Sparkles } from "lucide-react";
 import { useI18n } from "@/components/I18nProvider";
+import { RECOMMENDED_SITES } from "@/lib/recommendedSites";
+import { toast } from "sonner";
 
-type ExternalSite = { name: string; template: string };
-const LS_KEY = "external_sites_v2";
+type Site = { name: string; url: string };
 
-function buildUrl(tpl: string, q: string) {
-  const enc = encodeURIComponent(q);
-  const plus = q.trim().replace(/\s+/g, "+");
-  if (tpl.includes("{plus}")) return tpl.replaceAll("{plus}", plus);
-  if (tpl.includes("{raw}")) return tpl.replaceAll("{raw}", q);
-  if (tpl.includes("{query}")) return tpl.replaceAll("{query}", enc);
-  return `${tpl}${tpl.includes("?") ? "&" : "?"}q=${enc}`;
-}
-
-export default function ExternalQuick({
-  currentQuery,
-  onManageClick,
-}: {
-  currentQuery: string;
-  onManageClick?: () => void;
-}) {
+export default function ExternalQuick() {
   const { t } = useI18n();
-  const [sites, setSites] = useState<ExternalSite[]>([]);
+  const [sites, setSites] = useState<Site[]>([]);
+  const [name, setName] = useState("");
+  const [url, setUrl] = useState("");
 
   useEffect(() => {
-    try { setSites(JSON.parse(localStorage.getItem(LS_KEY) || "[]")); } catch {}
-    const onStorage = () => {
-      try { setSites(JSON.parse(localStorage.getItem(LS_KEY) || "[]")); } catch {}
-    };
-    window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
+    try {
+      const saved = localStorage.getItem("biblio_external_sites");
+      if (saved) setSites(JSON.parse(saved));
+    } catch {}
   }, []);
 
-  const buttons = useMemo(() => {
-    if (!currentQuery.trim()) return [];
-    return sites.slice(0, 8).map((s) => ({
-      name: s.name,
-      href: buildUrl(s.template, currentQuery),
-    }));
-  }, [sites, currentQuery]);
+  const save = (newSites: Site[]) => {
+    setSites(newSites);
+    localStorage.setItem("biblio_external_sites", JSON.stringify(newSites));
+    window.dispatchEvent(new Event("external-sites-updated"));
+  };
 
-  if (!sites.length) {
-    return (
-      <div className="text-sm text-muted">
-        {t("ext.quick.none")}{" "}
-        <button className="underline" onClick={onManageClick}>{t("ext.quick.add")}</button>
-      </div>
-    );
-  }
+  const add = () => {
+    if (!name || !url.startsWith("http")) return;
+    save([...sites, { name, url }]);
+    setName("");
+    setUrl("");
+    toast.success("Site adicionado!");
+  };
+
+  const remove = (index: number) => {
+    save(sites.filter((_, i) => i !== index));
+    toast("Site removido", { icon: "🗑️" });
+  };
+
+  const addRecommended = () => {
+    const newSites = [...sites];
+    let addedCount = 0;
+
+    RECOMMENDED_SITES.forEach(rec => {
+      if (!newSites.some(s => s.url === rec.url)) {
+        newSites.push({ name: rec.name, url: rec.url });
+        addedCount++;
+      }
+    });
+
+    if (addedCount > 0) {
+      save(newSites);
+      toast.success(`${addedCount} fontes adicionadas!`);
+    } else {
+      toast.info("Já possui todas as sugestões.");
+    }
+  };
 
   return (
-    <div className="space-y-2">
-      <div className="text-sm font-medium">{t("ext.quick.title")}</div>
-      <div className="flex gap-2 overflow-x-auto no-scrollbar">
-        {buttons.length ? buttons.map((b, i) => (
-          <a
-            key={i}
-            href={b.href}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="px-3 py-1.5 text-sm border border-soft rounded-full bg-surface hover:bg-app transition whitespace-nowrap"
-            title={t("ext.openIn", { name: b.name })}
-          >
-            {b.name}
-          </a>
-        )) : (
-          <div className="text-xs text-muted">
-            {t("ext.quick.typeToEnable")}
+    <div className="space-y-6">
+      <div className="space-y-3">
+        {sites.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-8 text-muted-foreground border border-dashed border-border rounded-xl bg-muted/20">
+            <p className="mb-4 text-sm">{t("ext.quick.none")}</p>
+            <button onClick={addRecommended} className="btn-primary btn-sm gap-2">
+              <Sparkles size={14} />
+              Adicionar Sugestões
+            </button>
+          </div>
+        ) : (
+          <div className="grid gap-2">
+            {sites.map((site, i) => (
+              <div key={i} className="flex items-center justify-between p-3 rounded-lg border border-border bg-card shadow-sm group hover:border-primary/30 transition-colors">
+                <div className="flex items-center gap-3 overflow-hidden">
+                  <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center text-muted-foreground">
+                    <Globe size={16} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-medium text-sm truncate text-foreground">{site.name}</p>
+                    <p className="text-xs text-muted-foreground truncate opacity-70 font-mono">{site.url}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => remove(i)}
+                  className="btn-icon text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                  title={t("common.remove")}
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            ))}
           </div>
         )}
       </div>
 
-      <div>
-        <button className="text-xs underline" onClick={onManageClick}>
-          {t("ext.quick.manage")}
-        </button>
+      <div className="p-5 rounded-xl bg-muted/30 border border-border space-y-4">
+        <div className="flex items-center justify-between">
+          <h4 className="text-sm font-bold flex items-center gap-2 text-foreground">
+            <Plus size={16} className="text-primary" />
+            {t("ext.quick.add")}
+          </h4>
+          {sites.length > 0 && (
+            <button onClick={addRecommended} className="text-xs text-primary hover:underline flex items-center gap-1">
+              <Sparkles size={12} />
+              Recarregar sugestões
+            </button>
+          )}
+        </div>
+        
+        <div className="grid gap-3 sm:grid-cols-[1fr_2fr_auto]">
+          <input
+            className="field bg-background"
+            placeholder={t("ext.namePh")}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+          <input
+            className="field bg-background"
+            placeholder={t("ext.urlPh")}
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+          />
+          <button 
+            onClick={add} 
+            disabled={!name || !url}
+            className="btn-primary w-full sm:w-auto"
+          >
+            {t("ext.add")}
+          </button>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Dica: Use <code>{`{query}`}</code> onde o termo pesquisado deve entrar.
+        </p>
       </div>
     </div>
   );
