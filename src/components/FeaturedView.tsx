@@ -19,7 +19,6 @@ export default function FeaturedView() {
   const [loading, setLoading] = useState(true);
   const [activeTopic, setActiveTopic] = useState(TOPICS[0]);
 
-  // useCallback agora não depende de 'books' ou 'activeTopic', tornando-se estável
   const loadTopic = useCallback(async (topic: typeof TOPICS[0]) => {
     setLoading(true);
     setActiveTopic(topic);
@@ -28,7 +27,6 @@ export default function FeaturedView() {
       const res = await fetch(`/api/search?q=${encodeURIComponent(topic.query)}`);
       const data = await res.json();
       
-      // Tipagem explícita para evitar erro de 'any'
       const results = (data.results || []) as BookResult[];
       const withCover = results.filter((b) => b.cover);
       const candidates = withCover.length >= 6 ? withCover : results;
@@ -42,7 +40,6 @@ export default function FeaturedView() {
     }
   }, []);
 
-  // Adicionamos loadTopic ao array de dependências (agora é seguro)
   useEffect(() => {
     loadTopic(TOPICS[0]);
   }, [loadTopic]);
@@ -87,11 +84,13 @@ export default function FeaturedView() {
 
       <div className="min-h-[300px]">
         {loading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[1, 2, 3, 4, 5, 6].map((i) => <SkeletonCard key={i} />)}
+          // CORRIGIDO: md:grid-cols-2 (era lg:grid-cols-3)
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {[1, 2, 3, 4].map((i) => <SkeletonCard key={i} />)}
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          // CORRIGIDO: md:grid-cols-2 (era lg:grid-cols-3)
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {books.map((book) => (
               <div key={book.id} className="h-full transform transition-all duration-300 hover:-translate-y-1">
                 <BookCard book={book} />
